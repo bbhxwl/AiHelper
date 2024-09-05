@@ -48,30 +48,12 @@ namespace AiHelper
                 float tempConfidence = box[4];
                 if (tempConfidence>=confidence)
                 {
-                    // 获取 YOLOv5 的边框坐标（以中心点为基准）
-                    float centerX = box[0] * inputWidth;
-                    float centerY = box[1] * inputHeight;
-                    float width = box[2] * inputWidth;
-                    float height = box[3] * inputHeight;
-
-                    // 将中心点坐标转换为左上角坐标
-                    float x = centerX - width / 2;
-                    float y = centerY - height / 2;
-
-                    // 将坐标映射回原始图像尺寸
-                    float xRatio = (float)originalWidth / inputWidth;
-                    float yRatio = (float)originalHeight / inputHeight;
-
-                    int originalX = (int)(x * xRatio);
-                    int originalY = (int)(y * yRatio);
-                    int originalWidthBox = (int)(width * xRatio);
-                    int originalHeightBox = (int)(height * yRatio);
                     classificationModels.Add(new ClassificationModel
                     {
-                        X = originalX,
-                        Y = originalY,
-                        Width = originalWidthBox,
-                        Height = originalHeightBox,
+                        X = (int) box[0],
+                        Y = (int) box[1],
+                        Width = (int)box[2],
+                        Height = (int) box[3],
                         Confidence = tempConfidence,
                         LabelIndex = box.Skip(5).ToList().IndexOf(box.Skip(5).Max())
                     });
