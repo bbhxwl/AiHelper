@@ -23,7 +23,13 @@ namespace AiHelper
         /// <returns></returns>
         public List<ClassificationModel> Prediction(Stream imgStream,float confidence=0.5f)
         {
-            List<NamedOnnxValue> inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor<float>("images",PreprocessImage(imgStream)) };
+            SKBitmap originalBitmap = SKBitmap.Decode(imgStream);
+            int originalWidth = originalBitmap.Width;
+            int originalHeight = originalBitmap.Height;
+            int inputWidth = 640; 
+            int inputHeight = 640;
+            List<NamedOnnxValue> inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor<float>("images",PreprocessImage(originalBitmap,inputWidth,inputHeight)) };
+            
             var results = _session.Run(inputs);
             var output = results.First().AsTensor<float>();
             var boxes = new List<float[]>();
@@ -42,12 +48,30 @@ namespace AiHelper
                 float tempConfidence = box[4];
                 if (tempConfidence>=confidence)
                 {
+                    // 获取 YOLOv5 的边框坐标（以中心点为基准）
+                    float centerX = box[0] * inputWidth;
+                    float centerY = box[1] * inputHeight;
+                    float width = box[2] * inputWidth;
+                    float height = box[3] * inputHeight;
+
+                    // 将中心点坐标转换为左上角坐标
+                    float x = centerX - width / 2;
+                    float y = centerY - height / 2;
+
+                    // 将坐标映射回原始图像尺寸
+                    float xRatio = (float)originalWidth / inputWidth;
+                    float yRatio = (float)originalHeight / inputHeight;
+
+                    int originalX = (int)(x * xRatio);
+                    int originalY = (int)(y * yRatio);
+                    int originalWidthBox = (int)(width * xRatio);
+                    int originalHeightBox = (int)(height * yRatio);
                     classificationModels.Add(new ClassificationModel
                     {
-                        X = (int) (box[0] * 640),
-                        Y = (int) (box[1] * 640),
-                        Width = (int) (box[2] * 640),
-                        Height = (int) (box[3] * 640),
+                        X = originalX,
+                        Y = originalY,
+                        Width = originalWidthBox,
+                        Height = originalHeightBox,
                         Confidence = tempConfidence,
                         LabelIndex = box.Skip(5).ToList().IndexOf(box.Skip(5).Max())
                     });
@@ -66,6 +90,33 @@ namespace AiHelper
         {
             // 使用SkiaSharp进行图像处理
             using (SKBitmap skBitmap = SKBitmap.Decode(imgStream))
+            using (SKBitmap resizedBitmap =
+                   skBitmap.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.High))
+            {
+                // 将图片像素转换为浮点数数组，存储为 [channels, width, height]
+                float[] imageData = new float[3 * targetWidth * targetHeight]; // 3是因为RGB三通道
+                int indexR = 0;
+                int indexG = targetWidth * targetHeight;
+                int indexB = 2 * targetWidth * targetHeight;
+                for (int y = 0; y < resizedBitmap.Height; y++)
+                {
+                    for (int x = 0; x < resizedBitmap.Width; x++)
+                    {
+                        SKColor pixel = resizedBitmap.GetPixel(x, y);
+                        // 将像素值归一化到0-1之间
+                        imageData[indexR++] = pixel.Red / 255.0f;
+                        imageData[indexG++] = pixel.Green / 255.0f;
+                        imageData[indexB++] = pixel.Blue / 255.0f;
+                    }
+                }
+
+                // 将数据转换为Tensor<float>
+                var dimensions = new[] { 1, 3, targetHeight, targetWidth }; // batch size 为 1, 通道在前
+                return new DenseTensor<float>(imageData, dimensions);
+            }
+        }
+        public static Tensor<float> PreprocessImage(SKBitmap skBitmap, int targetWidth = 640, int targetHeight = 640)
+        {
             using (SKBitmap resizedBitmap =
                    skBitmap.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.High))
             {
