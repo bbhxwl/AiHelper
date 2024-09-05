@@ -4,6 +4,8 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <Authors>bbhxwl</Authors>
+        <PackageProjectUrl>https://github.com/bbhxwl/AiHelper</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/bbhxwl/AiHelper</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
